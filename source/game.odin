@@ -2,22 +2,29 @@ package arcadia
 
 import rl "vendor:raylib"
 
-main :: proc() {
-    WINDOW_WIDHT :: 854
-    WINDOW_HEIGHT :: 480
+WINDOW_WIDHT :: 854
+WINDOW_HEIGHT :: 480
 
-    rl.InitWindow(WINDOW_WIDHT, WINDOW_HEIGHT, "Arcadia")
-    rl.SetTargetFPS(144)
+@(export)
+game_init :: proc() {
+	rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
+	rl.InitWindow(WINDOW_WIDHT, WINDOW_HEIGHT, "Arcadia")
+}
 
-    for !rl.WindowShouldClose() {
-        rl.BeginDrawing()
-        
-        rl.ClearBackground(rl.RAYWHITE)
-        rl.DrawFPS(10, 10)
-        rl.DrawText("Hello Arcadia!", 360, WINDOW_HEIGHT /  2, 20, rl.LIGHTGRAY)
+@(export)
+game_loop :: proc() -> bool {
+	rl.BeginDrawing()
 
-        rl.EndDrawing()
-    }
+	rl.ClearBackground(rl.RAYWHITE)
+	rl.DrawFPS(10, 10)
+	rl.DrawText("Hello Arcadia!", 360, WINDOW_HEIGHT / 2, 20, rl.LIGHTGRAY)
 
-    rl.CloseWindow()
+	rl.EndDrawing()
+
+	return !rl.WindowShouldClose()
+}
+
+@(export)
+game_shutdown :: proc() {
+	rl.CloseWindow()
 }
