@@ -7,29 +7,43 @@ import "core:os/os2"
 import "core:path/filepath"
 import "core:time"
 
-Game_API :: struct {
-	__handle: dynlib.Library,
-	__is_odd: bool,
-	init:     proc(),
-	loop:     proc() -> bool,
-	shutdown: proc(),
+Game_Lib :: struct {
+	__handle:    dynlib.Library,
+	__path:      string,
+	window_init: proc(),
+	loop:        proc() -> bool,
+	shutdown:    proc(),
+	memory_init: proc() -> rawptr,
+	memory_size: proc() -> int,
+	memory_set:  proc(mem: rawptr),
 }
 
-load_dll :: proc(path: string, is_odd: bool) -> (api: Game_API, ok: bool) {
-	log.info("Load DLL at", path, is_odd)
+load_lib :: proc(path: string, index: int) -> (lib: Game_Lib, ok: bool) {
+	log.info("Load DLL at", path, index)
 
-	oddity_str := "A" if is_odd else "B"
-	tmp_filename := fmt.tprintf("tmp%v_game.dll", oddity_str)
+	tmp_filename := fmt.tprintf("tmp%v_%v", index, filepath.base(path))
 	tmp_path := filepath.join({filepath.dir(path), tmp_filename})
 
-	log.debug("Copy DLL to", tmp_path)
-	os2.copy_file(tmp_path, path)
+	log.info("Copy DLL to", tmp_path)
+	err := os2.copy_file(tmp_path, path)
+	if err != nil {return}
+	lib.__path = tmp_path
 
-	_, ok = dynlib.initialize_symbols(&api, tmp_path, "game_")
-
-	api.__is_odd = is_odd
+	_, ok = dynlib.initialize_symbols(&lib, tmp_path, "game_")
 
 	return
+}
+
+unload_lib :: proc(lib: ^Game_Lib) {
+	log.info("Unload lib", lib.__path)
+
+	ok := dynlib.unload_library(lib.__handle)
+	if !ok {
+		log.error("unload failed:", dynlib.last_error())
+		return
+	}
+
+	os2.remove(lib.__path)
 }
 
 get_file_timestamp :: proc(path: string) -> time.Time {
@@ -57,21 +71,27 @@ main :: proc() {
 	dll_path := os2.args[1]
 	log.info("DLL:", dll_path)
 
-	api, ok := load_dll(dll_path, false)
+	lib, ok := load_lib(dll_path, 0)
 	if !ok {
 		log.error("DLL load failed! Error:", dynlib.last_error())
 		os2.exit(-1)
 	}
 
+	lib_counter := 0
+	old_game_libs := make([dynamic]Game_Lib)
+
 	dll_last_check := time.now()
 	dll_reload_period := time.Second
 	dll_last_timestamp := get_file_timestamp(dll_path)
 
-	api.init()
-	for api.loop() {
+	lib.window_init()
+	mem_ptr := lib.memory_init()
+	mem_size := lib.memory_size()
+
+	for lib.loop() {
 		if time.since(dll_last_check) > dll_reload_period {
 			dll_last_check = time.now()
-			log.info("check dll", time.to_unix_nanoseconds(time.now()))
+			log.debug("check dll", time.to_unix_nanoseconds(time.now()))
 
 			dll_current_timestamp := get_file_timestamp(dll_path)
 			if dll_current_timestamp == dll_last_timestamp {
@@ -79,23 +99,38 @@ main :: proc() {
 			}
 
 			dll_last_timestamp = dll_current_timestamp
-			new_api, ok := load_dll(dll_path, !api.__is_odd)
+			lib_counter += 1
+
+			new_lib, ok := load_lib(dll_path, lib_counter)
 			if !ok {
-				log.warn("DLL load error:", dynlib.last_error())
+				log.error("DLL load error:", dynlib.last_error())
 				continue
 			}
 
-			is_unloaded := dynlib.unload_library(api.__handle)
-			if !is_unloaded {
-				log.warn("DLL unload error:", dynlib.last_error())
-				dynlib.unload_library(new_api.__handle)
+			append(&old_game_libs, lib)
 
-				continue
+			new_mem_size := new_lib.memory_size()
+
+			if new_mem_size == mem_size {
+				new_lib.memory_set(mem_ptr)
+			} else {
+				log.info("Reset memory")
+				for &l in old_game_libs {unload_lib(&l)}
+				clear(&old_game_libs)
+
+				free(mem_ptr)
+				mem_ptr = new_lib.memory_init()
+				mem_size = new_mem_size
 			}
 
-			api = new_api
+			lib = new_lib
 			log.info("Hot reloaded")
 		}
 	}
-	api.shutdown()
+
+	lib.shutdown()
+
+	for &l in old_game_libs {unload_lib(&l)}
+	clear(&old_game_libs)
+	unload_lib(&lib)
 }
