@@ -1,4 +1,8 @@
+$ProjectName = "arcadia"
 $BuildDir = "build"
+
+echo "Building hot runner"
+$stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
 # Create build dir
 New-Item -ItemType Directory -Force -Path $BuildDir > $null
@@ -9,14 +13,14 @@ function Panic {
     end { Exit -1 }
 }
 
-
-$ExeOutPath = Join-Path -Path $BuildDir -ChildPath "runner_hot.exe"
+$ExeOutPath = Join-Path -Path $BuildDir -ChildPath "$($ProjectName)_hot.exe"
 $GameRunning = $false
 if (Test-Path $ExeOutPath) {
     $AbsExePath = Resolve-Path $ExeOutPath
-    $GameRunning = [bool](Get-Process | ?{$_.path -eq $AbsExePath})
+    $GameRunning = [bool](Get-Process "$($ProjectName)_hot" 2>$null | ?{$_.path -eq $AbsExePath})
 }
 
+echo "Is game running: $GameRunning" 
 
 # PDB file is locked by debugger so we need to change its name
 $PdbDir = Join-Path -Path $BuildDir -ChildPath "pdb"
@@ -66,3 +70,7 @@ odin build runner\hot.odin -file -strict-style -debug -out:$ExeOutPath
 if (!$?) {
     "Runner build failed!" | Panic
 }
+
+$stopwatch.Stop()
+
+echo "Done! ( $($stopwatch.Elapsed.TotalSeconds)s )"

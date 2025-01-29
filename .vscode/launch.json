@@ -9,7 +9,7 @@
       "type": "cppvsdbg",
       "request": "launch",
       "preLaunchTask": "Build hot-reload",
-      "program": "${workspaceFolder}\\build\\runner_hot.exe",
+      "program": "${workspaceFolder}\\build\\arcadia_hot.exe",
       "args": ["${workspaceFolder}\\build\\game.dll"],
       "cwd": "${workspaceFolder}",
       "environment": [],
