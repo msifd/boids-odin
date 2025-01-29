@@ -126,6 +126,8 @@ main :: proc() {
 			lib = new_lib
 			log.info("Hot reloaded")
 		}
+
+		free_all(context.temp_allocator)
 	}
 
 	lib.shutdown()
