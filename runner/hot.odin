@@ -8,14 +8,15 @@ import "core:path/filepath"
 import "core:time"
 
 Game_Lib :: struct {
-	__handle:    dynlib.Library,
-	__path:      string,
-	window_init: proc(),
-	loop:        proc() -> bool,
-	shutdown:    proc(),
-	memory_init: proc() -> rawptr,
-	memory_size: proc() -> int,
-	memory_set:  proc(mem: rawptr),
+	__handle:     dynlib.Library,
+	__path:       string,
+	window_init:  proc(),
+	loop:         proc() -> bool,
+	shutdown:     proc(),
+	memory_make:  proc() -> rawptr,
+	memory_size:  proc() -> int,
+	memory_set:   proc(mem: rawptr),
+	force_reload: proc() -> bool,
 }
 
 load_lib :: proc(path: string, index: int) -> (lib: Game_Lib, ok: bool) {
@@ -81,49 +82,60 @@ main :: proc() {
 	old_game_libs := make([dynamic]Game_Lib)
 
 	dll_last_check := time.now()
-	dll_reload_period := time.Second
+	dll_reload_period :: 1000 * time.Millisecond
 	dll_last_timestamp := get_file_timestamp(dll_path)
 
 	lib.window_init()
-	mem_ptr := lib.memory_init()
+	mem_ptr := lib.memory_make()
 	mem_size := lib.memory_size()
+	lib.memory_set(mem_ptr)
 
 	for lib.loop() {
-		if time.since(dll_last_check) > dll_reload_period {
+		force_reload := lib.force_reload()
+		should_check_dll := time.since(dll_last_check) > dll_reload_period
+
+		if should_check_dll || force_reload {
 			dll_last_check = time.now()
-			log.debug("check dll", time.to_unix_nanoseconds(time.now()))
 
 			dll_current_timestamp := get_file_timestamp(dll_path)
-			if dll_current_timestamp == dll_last_timestamp {
+			dll_changed: bool = dll_current_timestamp != dll_last_timestamp
+			if !dll_changed && !force_reload {
 				continue
 			}
 
-			dll_last_timestamp = dll_current_timestamp
-			lib_counter += 1
+			target_lib := lib
+			if dll_changed {
+				dll_last_timestamp = dll_current_timestamp
+				lib_counter += 1
 
-			new_lib, ok := load_lib(dll_path, lib_counter)
-			if !ok {
-				log.error("DLL load error:", dynlib.last_error())
-				continue
+				new_lib, ok := load_lib(dll_path, lib_counter)
+				if !ok {
+					log.error("DLL load error:", dynlib.last_error())
+					continue
+				}
+
+				append(&old_game_libs, new_lib)
+				target_lib = new_lib
 			}
 
-			append(&old_game_libs, lib)
+			new_mem_size := target_lib.memory_size()
+			mem_changed := new_mem_size != mem_size
 
-			new_mem_size := new_lib.memory_size()
+			if mem_changed || force_reload {
+				if dll_changed {
+					log.info("Unload old libs")
+					for &l in old_game_libs {unload_lib(&l)}
+					clear(&old_game_libs)
+				}
 
-			if new_mem_size == mem_size {
-				new_lib.memory_set(mem_ptr)
-			} else {
 				log.info("Reset memory")
-				for &l in old_game_libs {unload_lib(&l)}
-				clear(&old_game_libs)
-
 				free(mem_ptr)
-				mem_ptr = new_lib.memory_init()
+				mem_ptr = target_lib.memory_make()
 				mem_size = new_mem_size
 			}
+			target_lib.memory_set(mem_ptr)
 
-			lib = new_lib
+			lib = target_lib
 			log.info("Hot reloaded")
 		}
 

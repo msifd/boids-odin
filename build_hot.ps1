@@ -38,7 +38,7 @@ Set-Content -Path $PdbCounterPath -Value $PdbCounter
 $DllOutPath = Join-Path -Path $BuildDir -ChildPath "game.dll"
 $PdbOutPath = Join-Path -Path $PdbDir -ChildPath "game_$PdbCounter.pdb"
 echo "Build DLL: $DllOutPath ; PDB: $PdbOutPath"
-odin build source -strict-style -vet -debug -build-mode:dll -out:$DllOutPath -pdb-name:$PdbOutPath -define:RAYLIB_SHARED=true
+odin build source -strict-style -debug -build-mode:dll -out:$DllOutPath -pdb-name:$PdbOutPath -define:RAYLIB_SHARED=true
 
 if (!$?) {
     "Game DLL build failed!" | Panic
@@ -46,6 +46,7 @@ if (!$?) {
 
 if ($GameRunning) {
     echo "Skip runner build"
+    echo "Game DLL done! ( $($stopwatch.Elapsed.TotalSeconds)s )"
     return
 }
 
@@ -71,6 +72,4 @@ if (!$?) {
     "Runner build failed!" | Panic
 }
 
-$stopwatch.Stop()
-
-echo "Done! ( $($stopwatch.Elapsed.TotalSeconds)s )"
+echo "Game DLL + Runner done! ( $($stopwatch.Elapsed.TotalSeconds)s )"

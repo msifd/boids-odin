@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build hot-reload",
+      "label": "build_hot",
       "type": "shell",
       "command": "${workspaceFolder}/build_hot.ps1",
       "group": {
@@ -13,11 +13,20 @@
       },
       "presentation": {
         "clear": true,
-        // "echo": true,
         "panel": "shared",
         "reveal": "silent",
         "showReuseMessage": false,
-        // "close": true,
+      }
+    },
+    {
+      "label": "cleanup_hot",
+      "type": "shell",
+      "command": "${workspaceFolder}/cleanup_hot.ps1",
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "silent",
+        "showReuseMessage": false,
+        "close": true,
       }
     }
   ]
