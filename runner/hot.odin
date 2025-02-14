@@ -113,8 +113,6 @@ main :: proc() {
 					log.error("DLL load error:", dynlib.last_error())
 					continue
 				}
-
-				append(&old_game_libs, new_lib)
 				target_lib = new_lib
 			}
 
@@ -122,20 +120,25 @@ main :: proc() {
 			mem_changed := new_mem_size != mem_size
 
 			if mem_changed || force_reload {
+				log.info("Reset memory")
+				free(mem_ptr)
+
 				if dll_changed {
 					log.info("Unload old libs")
 					for &l in old_game_libs {unload_lib(&l)}
 					clear(&old_game_libs)
 				}
 
-				log.info("Reset memory")
-				free(mem_ptr)
 				mem_ptr = target_lib.memory_make()
 				mem_size = new_mem_size
 			}
 			target_lib.memory_set(mem_ptr)
 
 			lib = target_lib
+			if dll_changed {
+				append(&old_game_libs, lib)
+			}
+
 			log.info("Hot reloaded")
 		}
 

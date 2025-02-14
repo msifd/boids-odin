@@ -1,7 +1,5 @@
 package arcadia
 
-// import "core:fmt"
-// import "core:math"
 import rl "vendor:raylib"
 
 WINDOW_WIDHT :: 854
@@ -14,8 +12,7 @@ Boid :: struct {
 }
 
 Game_State :: struct {
-	counter: int,
-	boids:   [dynamic]Boid,
+	boids: [dynamic]Boid,
 }
 
 state: ^Game_State
@@ -23,15 +20,21 @@ state: ^Game_State
 @(export)
 game_window_init :: proc() {
 	rl.SetConfigFlags({.VSYNC_HINT})
-	rl.InitWindow(WINDOW_WIDHT, WINDOW_HEIGHT, "Arcadia")
+	rl.InitWindow(WINDOW_WIDHT, WINDOW_HEIGHT, "Boids")
 	rl.SetTargetFPS(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor()) + 1)
 }
 
 @(export)
 game_memory_make :: proc() -> rawptr {
 	s := new(Game_State)
+	create_boids(s)
+	return s
+}
 
-	for _ in 0 ..< 100 {
+create_boids :: proc(s: ^Game_State) {
+	clear(&s.boids)
+
+	for _ in 0 ..< 500 {
 		x := cast(f32)rl.GetRandomValue(10, WINDOW_WIDHT - 10)
 		y := cast(f32)rl.GetRandomValue(10, WINDOW_HEIGHT - 10)
 		vx := cast(f32)rl.GetRandomValue(-10, 10) / 10
@@ -39,19 +42,18 @@ game_memory_make :: proc() -> rawptr {
 
 		append(&s.boids, Boid{pos = {x, y}, vel = {vx, vy}})
 	}
-
-	return s
 }
 
 move_boids :: proc() {
-	EFFECT_RADIUS :: 100
-	DESIRED_SEPARATION :: 30
+	EFFECT_RADIUS :: 50
+	DESIRED_SEPARATION :: 25
 	MAX_SPEED :: 150.
-	MAX_FORCE :: 0.5
+	MAX_FORCE :: 2
 
 	COH_WEIGHT :: 1.
 	ALI_WEIGHT :: 1.
 	SEP_WEIGHT :: 1.5
+	CUR_WEIGHT :: 1
 
 	delta := rl.GetFrameTime()
 
@@ -59,7 +61,7 @@ move_boids :: proc() {
 		neighbors: f32
 		per_center: rl.Vector2
 		per_vel: rl.Vector2
-		sep_factor: rl.Vector2
+		sep_vel: rl.Vector2
 
 		for n in state.boids {
 			dist := rl.Vector2Distance(b.pos, n.pos)
@@ -71,25 +73,34 @@ move_boids :: proc() {
 			per_center += n.pos
 			per_vel += n.vel
 			if dist < DESIRED_SEPARATION {
-				sep_factor += rl.Vector2Normalize(b.pos - n.pos)
+				sep_vel += rl.Vector2Normalize(b.pos - n.pos) / dist
 			}
 		}
 		if neighbors > 0 {
 			per_center /= neighbors
 			per_vel /= neighbors
-			sep_factor /= neighbors
+			sep_vel /= neighbors
 		}
-
-		rl.DrawRectangleV(per_center, {2, 2}, rl.WHITE)
 
 		coh_vel := rl.Vector2Normalize(per_center - b.pos) * MAX_SPEED
 		ali_vel := rl.Vector2Normalize(per_vel) * MAX_SPEED
-		sep_vel := rl.Vector2Normalize(sep_factor) * MAX_SPEED
+		sep_vel = rl.Vector2Normalize(sep_vel) * MAX_SPEED
 
 		acc: rl.Vector2
-		acc += rl.Vector2ClampValue(coh_vel - b.vel, -MAX_FORCE, MAX_FORCE) * COH_WEIGHT
-		acc += rl.Vector2ClampValue(ali_vel - b.vel, -MAX_FORCE, MAX_FORCE) * ALI_WEIGHT
-		acc += rl.Vector2ClampValue(sep_vel - b.vel, -MAX_FORCE, MAX_FORCE) * SEP_WEIGHT
+		if rl.IsMouseButtonDown(.LEFT) {
+			cur := rl.GetMousePosition()
+			cur_vel := rl.Vector2Normalize(cur - b.pos) * MAX_SPEED
+			acc += rl.Vector2ClampValue(cur_vel - b.vel, -MAX_FORCE, MAX_FORCE) * CUR_WEIGHT
+		}
+		if coh_vel != 0 {
+			acc += rl.Vector2ClampValue(coh_vel - b.vel, -MAX_FORCE, MAX_FORCE) * COH_WEIGHT
+		}
+		if ali_vel != 0 {
+			acc += rl.Vector2ClampValue(ali_vel - b.vel, -MAX_FORCE, MAX_FORCE) * ALI_WEIGHT
+		}
+		if sep_vel != 0 {
+			acc += rl.Vector2ClampValue(sep_vel - b.vel, -MAX_FORCE, MAX_FORCE) * SEP_WEIGHT
+		}
 
 		b.vel = rl.Vector2ClampValue(b.vel + acc, -MAX_SPEED, MAX_SPEED)
 		b.pos += b.vel * delta
@@ -118,36 +129,23 @@ wrap_around :: proc() {
 
 @(export)
 game_loop :: proc() -> bool {
-	state.counter += 1
+	if rl.IsKeyPressed(.R) {
+		create_boids(&state^)
+	}
 
 	rl.BeginDrawing()
 
 	rl.ClearBackground(rl.BLACK)
-	rl.DrawFPS(10, 10)
-	// rl.DrawText("Hello Arcadia!", 360, 200, 20, rl.LIGHTGRAY)
-	// rl.DrawText(fmt.ctprintf("Counter: %v", state.counter), 360, 216, 20, rl.BEIGE)
+	// rl.DrawFPS(10, 10)
+	rl.DrawText("r - reset", 10, 10, 10, rl.RAYWHITE)
 
 	move_boids()
 	wrap_around()
 	for b in state.boids {
-		SIZE :: rl.Vector2{10, 10}
-		rl.DrawRectangleV(b.pos, SIZE, rl.RED)
-
-		// rl.DrawLineV(b.pos + SIZE / 2, b.pos + b.vel, rl.BLUE)
-		
-		rl.DrawLineV(b.pos + SIZE / 2, b.pos + rl.Vector2Normalize(b.vel) * 20, rl.BLUE)
-		rl.DrawLineV(b.pos + SIZE / 2, b.pos + b.acc * 20, rl.GREEN)
-
-		// rl.DrawTriangle(
-		// 	rl.Vector3RotateByAxisAngle(),
-		// 	rl.RED
-		// )
+		RADIUS :: 5
+		rl.DrawCircleV(b.pos, RADIUS, rl.RED)
+		rl.DrawLineV(b.pos, b.pos + rl.Vector2Normalize(b.vel) * 10, rl.RED)
 	}
-
-	// center : rl.Vector2
-	// for b in state.boids {
-	// 	center += b.pos
-	// }
 
 	rl.EndDrawing()
 
@@ -158,12 +156,9 @@ game_loop :: proc() -> bool {
 game_shutdown :: proc() {
 	rl.CloseWindow()
 }
-
-
 @(export)
 game_memory_size :: proc() -> int {return size_of(Game_State)}
 @(export)
 game_memory_set :: proc(mem: rawptr) {state = (^Game_State)(mem)}
 @(export)
-// game_force_reload :: proc() -> bool {return rl.IsKeyDown(.LEFT_SHIFT) && rl.IsKeyPressed(.R)}
 game_force_reload :: proc() -> bool {return rl.IsKeyPressed(.F6)}
