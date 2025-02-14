@@ -67,7 +67,7 @@ if (-Not (Test-Path $LocalRaylibPath)) {
 
 
 echo "Build runner $ExeOutPath"
-odin build runner\hot.odin -file -strict-style -debug -out:$ExeOutPath
+odin build "runner/hot" -file -strict-style -debug -out:$ExeOutPath
 if (!$?) {
     "Runner build failed!" | Panic
 }

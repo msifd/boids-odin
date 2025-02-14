@@ -34,7 +34,7 @@ game_memory_make :: proc() -> rawptr {
 create_boids :: proc(s: ^Game_State) {
 	clear(&s.boids)
 
-	for _ in 0 ..< 500 {
+	for _ in 0 ..< 400 {
 		x := cast(f32)rl.GetRandomValue(10, WINDOW_WIDHT - 10)
 		y := cast(f32)rl.GetRandomValue(10, WINDOW_HEIGHT - 10)
 		vx := cast(f32)rl.GetRandomValue(-10, 10) / 10
