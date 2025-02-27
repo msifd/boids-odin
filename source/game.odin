@@ -8,7 +8,6 @@ WINDOW_HEIGHT :: 480
 Boid :: struct {
 	pos: rl.Vector2,
 	vel: rl.Vector2,
-	acc: rl.Vector2,
 }
 
 Game_State :: struct {
@@ -45,6 +44,8 @@ create_boids :: proc(s: ^Game_State) {
 }
 
 move_boids :: proc() {
+	using rl
+
 	EFFECT_RADIUS :: 50
 	DESIRED_SEPARATION :: 25
 	MAX_SPEED :: 150.
@@ -55,16 +56,16 @@ move_boids :: proc() {
 	SEP_WEIGHT :: 1.5
 	CUR_WEIGHT :: 1
 
-	delta := rl.GetFrameTime()
+	delta := GetFrameTime()
 
 	for &b in state.boids {
 		neighbors: f32
-		per_center: rl.Vector2
-		per_vel: rl.Vector2
-		sep_vel: rl.Vector2
+		per_center: Vector2
+		per_vel: Vector2
+		sep_vel: Vector2
 
 		for n in state.boids {
-			dist := rl.Vector2Distance(b.pos, n.pos)
+			dist := Vector2Distance(b.pos, n.pos)
 			if dist == 0 || dist > EFFECT_RADIUS {
 				continue
 			}
@@ -73,7 +74,7 @@ move_boids :: proc() {
 			per_center += n.pos
 			per_vel += n.vel
 			if dist < DESIRED_SEPARATION {
-				sep_vel += rl.Vector2Normalize(b.pos - n.pos) / dist
+				sep_vel += Vector2Normalize(b.pos - n.pos) / dist
 			}
 		}
 		if neighbors > 0 {
@@ -82,29 +83,28 @@ move_boids :: proc() {
 			sep_vel /= neighbors
 		}
 
-		coh_vel := rl.Vector2Normalize(per_center - b.pos) * MAX_SPEED
-		ali_vel := rl.Vector2Normalize(per_vel) * MAX_SPEED
-		sep_vel = rl.Vector2Normalize(sep_vel) * MAX_SPEED
+		coh_vel := Vector2Normalize(per_center - b.pos) * MAX_SPEED
+		ali_vel := Vector2Normalize(per_vel) * MAX_SPEED
+		sep_vel = Vector2Normalize(sep_vel) * MAX_SPEED
 
-		acc: rl.Vector2
-		if rl.IsMouseButtonDown(.LEFT) {
-			cur := rl.GetMousePosition()
-			cur_vel := rl.Vector2Normalize(cur - b.pos) * MAX_SPEED
-			acc += rl.Vector2ClampValue(cur_vel - b.vel, -MAX_FORCE, MAX_FORCE) * CUR_WEIGHT
+		acc: Vector2
+		if IsMouseButtonDown(.LEFT) {
+			cur := GetMousePosition()
+			cur_vel := Vector2Normalize(cur - b.pos) * MAX_SPEED
+			acc += Vector2ClampValue(cur_vel - b.vel, -MAX_FORCE, MAX_FORCE) * CUR_WEIGHT
 		}
 		if coh_vel != 0 {
-			acc += rl.Vector2ClampValue(coh_vel - b.vel, -MAX_FORCE, MAX_FORCE) * COH_WEIGHT
+			acc += Vector2ClampValue(coh_vel - b.vel, -MAX_FORCE, MAX_FORCE) * COH_WEIGHT
 		}
 		if ali_vel != 0 {
-			acc += rl.Vector2ClampValue(ali_vel - b.vel, -MAX_FORCE, MAX_FORCE) * ALI_WEIGHT
+			acc += Vector2ClampValue(ali_vel - b.vel, -MAX_FORCE, MAX_FORCE) * ALI_WEIGHT
 		}
 		if sep_vel != 0 {
-			acc += rl.Vector2ClampValue(sep_vel - b.vel, -MAX_FORCE, MAX_FORCE) * SEP_WEIGHT
+			acc += Vector2ClampValue(sep_vel - b.vel, -MAX_FORCE, MAX_FORCE) * SEP_WEIGHT
 		}
 
-		b.vel = rl.Vector2ClampValue(b.vel + acc, -MAX_SPEED, MAX_SPEED)
+		b.vel = Vector2ClampValue(b.vel + acc, -MAX_SPEED, MAX_SPEED)
 		b.pos += b.vel * delta
-		b.acc = acc
 	}
 }
 
