@@ -25,7 +25,7 @@ state: ^Game_State
 
 @(export)
 game_window_init :: proc() {
-	rl.SetConfigFlags({.VSYNC_HINT})
+	rl.SetConfigFlags({.VSYNC_HINT, .WINDOW_RESIZABLE})
 	rl.InitWindow(WINDOW_WIDHT, WINDOW_HEIGHT, "Boids")
 	rl.SetTargetFPS(rl.GetMonitorRefreshRate(rl.GetCurrentMonitor()) + 1)
 }
@@ -35,7 +35,11 @@ game_window_init :: proc() {
 game_memory_make :: proc() -> rawptr {
 	s := new(Game_State)
 
-	s.boid_model = rl.LoadModel("assets/boid.glb")
+	model := rl.LoadModel("assets/boid.glb")
+	model.materials[0].maps[0].texture = model.materials[1].maps[0].texture
+
+	s.boid_model = model
+
 	s.camera = rl.Camera3D {
 		position   = {100, 50, 200},
 		target     = {0, 0, 0},
