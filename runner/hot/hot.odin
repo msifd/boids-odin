@@ -8,15 +8,16 @@ import "core:path/filepath"
 import "core:time"
 
 Game_Lib :: struct {
-	__handle:     dynlib.Library,
-	__path:       string,
-	window_init:  proc(),
-	loop:         proc() -> bool,
-	shutdown:     proc(),
-	memory_make:  proc() -> rawptr,
-	memory_size:  proc() -> int,
-	memory_set:   proc(mem: rawptr),
-	force_reload: proc() -> bool,
+	__handle:       dynlib.Library,
+	__path:         string,
+	window_init:    proc(),
+	loop:           proc() -> bool,
+	shutdown:       proc(),
+	memory_make:    proc() -> rawptr,
+	memory_size:    proc() -> int,
+	memory_set:     proc(mem: rawptr),
+	memory_cleanup: proc(mem: rawptr),
+	force_reload:   proc() -> bool,
 }
 
 load_lib :: proc(path: string, index: int) -> (lib: Game_Lib, ok: bool) {
@@ -121,6 +122,7 @@ main :: proc() {
 
 			if mem_changed || force_reload {
 				log.info("Reset memory")
+				lib.memory_cleanup(mem_ptr)
 				free(mem_ptr)
 
 				if dll_changed {
