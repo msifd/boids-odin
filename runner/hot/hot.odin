@@ -13,7 +13,7 @@ Game_Lib :: struct {
 	window_init:    proc(),
 	loop:           proc() -> bool,
 	shutdown:       proc(),
-	memory_make:    proc() -> rawptr,
+	memory_init:    proc() -> rawptr,
 	memory_size:    proc() -> int,
 	memory_set:     proc(mem: rawptr),
 	memory_cleanup: proc(mem: rawptr),
@@ -87,7 +87,7 @@ main :: proc() {
 	dll_last_timestamp := get_file_timestamp(dll_path)
 
 	lib.window_init()
-	mem_ptr := lib.memory_make()
+	mem_ptr := lib.memory_init()
 	mem_size := lib.memory_size()
 	lib.memory_set(mem_ptr)
 
@@ -131,7 +131,7 @@ main :: proc() {
 					clear(&old_game_libs)
 				}
 
-				mem_ptr = target_lib.memory_make()
+				mem_ptr = target_lib.memory_init()
 				mem_size = new_mem_size
 			}
 			target_lib.memory_set(mem_ptr)

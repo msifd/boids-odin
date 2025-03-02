@@ -1,6 +1,6 @@
 {
-    "files.autoSave": "off",
+    // "files.autoSave": "off",
     "triggerTaskOnSave.tasks": {
-        "build_hot": ["source/*.odin"],
+        // "build_hot": ["source/*.odin"],
     }
 }
