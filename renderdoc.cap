@@ -5,7 +5,7 @@
         "commandLine": "game.dll",
         "environment": [
         ],
-        "executable": "D:\\Dev\\arcadia\\build\\arcadia_hot.exe",
+        "executable": "C:\\Users\\remsi\\Private\\arcadia\\build\\arcadia_hot.exe",
         "inject": false,
         "numQueuedFrames": 0,
         "options": {
@@ -23,6 +23,6 @@
             "verifyBufferAccess": false
         },
         "queuedFrameCap": 0,
-        "workingDir": ""
+        "workingDir": "C:/Users/remsi/Private/arcadia"
     }
 }

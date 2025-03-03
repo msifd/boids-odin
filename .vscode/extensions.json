@@ -3,6 +3,7 @@
         "danielgavin.ols",
         "albertziegenhagel.childdebugger",
         "ms-vscode.cpptools",
-        "gruntfuggly.triggertaskonsave"
+        "gruntfuggly.triggertaskonsave",
+        "raczzalan.webgl-glsl-editor"
     ]
 }

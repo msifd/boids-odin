@@ -7,16 +7,15 @@ import rl "vendor:raylib"
 RES_BOID :: #load("../assets/boid.glb")
 
 Shader_Type :: enum {
-	INSTANCING_VERT,
-	INSTANCING_FRAG,
+	BASIC_INSTANCING_VERT,
+	BASIC_FRAG,
 }
 SHADERS :: [Shader_Type]cstring {
-	.INSTANCING_VERT = #load("../assets/basic_instancing.vs", cstring),
-	.INSTANCING_FRAG = #load("../assets/basic_instancing.fs", cstring),
+	.BASIC_INSTANCING_VERT = #load("../assets/basic_instancing.vs", cstring),
+	.BASIC_FRAG            = #load("../assets/basic.fs", cstring),
 }
 
-GAME_VOLUME_A :: rl.Vector3{100, 100, 100}
-GAME_VOLUME_B :: rl.Vector3{-100, -100, -100}
+VOLUME_SIZE :: 100
 
 Boid :: struct {
 	pos: rl.Vector3,
@@ -24,13 +23,10 @@ Boid :: struct {
 }
 
 Game_State :: struct {
-	boid_model:   rl.Model,
-	camera:       rl.Camera3D,
-	boids:        [dynamic]Boid,
+	boid_model: rl.Model,
+	camera:     rl.Camera3D,
+	boids:      [dynamic]Boid,
 	// boid_transforms: [dynamic]rl.Matrix,
-	cube:         rl.Mesh,
-	cube_mat:     rl.Material,
-	cube_mat_def: rl.Material,
 }
 
 state: ^Game_State
@@ -63,51 +59,33 @@ load_raylib_file: rl.LoadFileDataCallback : proc "c" (filename: cstring, data_le
 	return ptr
 }
 
-AMB_COLOR := rl.Vector4{0.2, 0.2, 0.2, 1.0}
-
-// MARK: game_memory_init
+// MARK: game mem init
 @(export)
 game_memory_init :: proc() -> rawptr {
 	rl.SetLoadFileDataCallback(load_raylib_file)
 
 	s := new(Game_State)
 
-	using rl.ShaderLocationIndex
 	instancing_shader := rl.LoadShaderFromMemory(
-		SHADERS[.INSTANCING_VERT],
-		SHADERS[.INSTANCING_FRAG],
+		SHADERS[.BASIC_INSTANCING_VERT],
+		SHADERS[.BASIC_FRAG],
 	)
-	// instancing_shader := rl.LoadShader("assets/basic_instancing.vs", "assets/basic_instancing.fs")
-	instancing_shader.locs[MATRIX_MVP] = rl.GetShaderLocation(instancing_shader, "mvp")
-	instancing_shader.locs[VECTOR_VIEW] = rl.GetShaderLocation(instancing_shader, "viewPos")
-	rl.SetShaderValue(
+	instancing_shader.locs[rl.ShaderLocationIndex.MATRIX_MVP] = rl.GetShaderLocation(
 		instancing_shader,
-		rl.GetShaderLocation(instancing_shader, "ambient"),
-		&AMB_COLOR,
-		.VEC4,
+		"mvp",
+	)
+	instancing_shader.locs[rl.ShaderLocationIndex.MATRIX_MODEL] = rl.GetShaderLocationAttrib(
+		instancing_shader,
+		"instanceTransform",
 	)
 
-	s.cube = rl.GenMeshCube(1, 1, 1)
-
-	cube_mat := rl.LoadMaterialDefault()
-	cube_mat.shader = instancing_shader
-	cube_mat.maps[rl.MaterialMapIndex.ALBEDO].color = rl.RED
-	s.cube_mat = cube_mat
-
-	cube_mat_def := rl.LoadMaterialDefault()
-	cube_mat_def.maps[rl.MaterialMapIndex.ALBEDO].color = rl.BLUE
-	s.cube_mat_def = cube_mat_def
-
-	log.debug("shaders", cube_mat.shader.id, cube_mat_def.shader.id, rl.LoadMaterialDefault().shader.id)
-
-	// model := rl.LoadModel("boid.glb")
-	// model.materials[0].maps[0].texture = model.materials[1].maps[0].texture
-	// model.materials[1].shader = instancing_shader
-	// model.materials[1].maps[rl.MaterialMapIndex.ALBEDO].color = rl.WHITE
-	// s.boid_model = model
+	model := rl.LoadModel("boid.glb")
+	model.materials[1].shader = instancing_shader
+	model.materials[1].maps[rl.MaterialMapIndex.ALBEDO].color = rl.BLUE
+	s.boid_model = model
 
 	s.camera = rl.Camera3D {
-		position   = {100, 50, 250},
+		position   = {100, 50, 200},
 		target     = {0, 0, 0},
 		up         = {0, 1, 0},
 		fovy       = 60,
@@ -126,9 +104,6 @@ game_memory_cleanup :: proc(s: ^Game_State) {
 	// delete(s.boid_transforms)
 
 	rl.UnloadModel(s.boid_model)
-	rl.UnloadMesh(s.cube)
-	rl.UnloadMaterial(s.cube_mat)
-	rl.UnloadMaterial(s.cube_mat_def)
 }
 
 // MARK: create_boids
@@ -136,33 +111,25 @@ create_boids :: proc(s: ^Game_State) {
 	clear_dynamic_array(&s.boids)
 	// clear_dynamic_array(&s.boid_transforms)
 
-	BOIDS_COUNT :: 100
+	BOIDS_COUNT :: 1000
 	reserve_dynamic_array(&s.boids, BOIDS_COUNT)
 	// reserve_dynamic_array(&s.boid_transforms, BOIDS_COUNT)
 
 	PREC :: 10
-	GVA: [3]i32 = {i32(GAME_VOLUME_A.x), i32(GAME_VOLUME_A.y), i32(GAME_VOLUME_A.z)}
-	GVB: [3]i32 = {i32(GAME_VOLUME_B.x), i32(GAME_VOLUME_B.y), i32(GAME_VOLUME_B.z)}
-	GVA = GVA * PREC - PREC
-	GVB = GVB * PREC + PREC
+	SVS :: VOLUME_SIZE * PREC
 
 	SCALE :: 8
 	scale_mx := rl.MatrixScale(SCALE, SCALE, SCALE)
 
 	for _ in 0 ..< BOIDS_COUNT {
 		pos := rl.Vector3 {
-			f32(rl.GetRandomValue(GVB.x, GVA.x)),
-			f32(rl.GetRandomValue(GVB.y, GVA.y)),
-			f32(rl.GetRandomValue(GVB.z, GVA.z)),
+			f32(rl.GetRandomValue(-SVS, SVS)),
+			f32(rl.GetRandomValue(-SVS, SVS)),
+			f32(rl.GetRandomValue(-SVS, SVS)),
 		}
 		pos /= PREC
-		vel := rl.Vector3 {
-			f32(rl.GetRandomValue(-10, 10) / 5),
-			f32(rl.GetRandomValue(-10, 10) / 5),
-			f32(rl.GetRandomValue(-10, 10) / 5),
-		}
 
-		append(&s.boids, Boid{pos, vel})
+		append(&s.boids, Boid{pos, 0})
 	}
 }
 
@@ -172,8 +139,8 @@ boid_apply_forces :: proc(b: Boid, delta: f32) -> (pos: rl.Vector3, vel: rl.Vect
 
 	EFFECT_RADIUS_SQRT :: 20 * 20
 	DESIRED_SEPARATION_SQRT :: 8 * 8
-	MAX_SPEED :: 50.
-	MAX_FORCE :: 0.5
+	MAX_SPEED :: 80
+	MAX_FORCE :: 1
 
 	COH_WEIGHT :: 1.0
 	ALI_WEIGHT :: 1.0
@@ -208,15 +175,9 @@ boid_apply_forces :: proc(b: Boid, delta: f32) -> (pos: rl.Vector3, vel: rl.Vect
 	sep_vel = Vector3Normalize(sep_vel) * MAX_SPEED
 
 	acc: Vector3
-	if coh_vel != 0 {
-		acc += Vector3ClampValue(coh_vel - b.vel, -MAX_FORCE, MAX_FORCE) * COH_WEIGHT
-	}
-	if ali_vel != 0 {
-		acc += Vector3ClampValue(ali_vel - b.vel, -MAX_FORCE, MAX_FORCE) * ALI_WEIGHT
-	}
-	if sep_vel != 0 {
-		acc += Vector3ClampValue(sep_vel - b.vel, -MAX_FORCE, MAX_FORCE) * SEP_WEIGHT
-	}
+	if coh_vel != 0 do acc += Vector3ClampValue(coh_vel - b.vel, -MAX_FORCE, MAX_FORCE) * COH_WEIGHT
+	if ali_vel != 0 do acc += Vector3ClampValue(ali_vel - b.vel, -MAX_FORCE, MAX_FORCE) * ALI_WEIGHT
+	if sep_vel != 0 do acc += Vector3ClampValue(sep_vel - b.vel, -MAX_FORCE, MAX_FORCE) * SEP_WEIGHT
 
 	vel = Vector3ClampValue(b.vel + acc, -MAX_SPEED, MAX_SPEED)
 	pos = b.pos + b.vel * delta
@@ -225,17 +186,16 @@ boid_apply_forces :: proc(b: Boid, delta: f32) -> (pos: rl.Vector3, vel: rl.Vect
 
 // MARK: boid_wrap_pos
 boid_wrap_pos :: proc(in_pos: rl.Vector3) -> (pos: rl.Vector3) {
-	origin := rl.Vector3{0, 0, 0}
-	HI := GAME_VOLUME_A
-	LOW := GAME_VOLUME_B
+	HI :: VOLUME_SIZE
+	LOW :: -VOLUME_SIZE
 
-	if in_pos.x > HI.x ||
-	   in_pos.y > HI.y ||
-	   in_pos.z > HI.z ||
-	   in_pos.x < LOW.x ||
-	   in_pos.y < LOW.y ||
-	   in_pos.z < LOW.z {
-		return rl.Vector3Clamp(origin - in_pos, LOW, HI)
+	if in_pos.x > HI ||
+	   in_pos.y > HI ||
+	   in_pos.z > HI ||
+	   in_pos.x < LOW ||
+	   in_pos.y < LOW ||
+	   in_pos.z < LOW {
+		return rl.Vector3Clamp(-in_pos, LOW, HI)
 	}
 
 	return in_pos
@@ -259,28 +219,30 @@ game_loop :: proc() -> bool {
 	if rl.IsKeyPressed(.R) {
 		create_boids(&state^)
 	}
+	if rl.IsMouseButtonPressed(.LEFT) {
+		if rl.IsCursorHidden() {
+			rl.ShowCursor()
+			rl.EnableCursor()
+		} else {
+			rl.HideCursor()
+			rl.DisableCursor()
+		}
+	}
 
-	// move_boids()
+	move_boids()
 
-	rl.UpdateCamera(&state.camera, .ORBITAL)
-	rl.SetShaderValue(
-		state.cube_mat.shader,
-		state.cube_mat.shader.locs[rl.ShaderLocationIndex.VECTOR_VIEW],
-		&state.camera.position,
-		.VEC3,
-	)
+	rl.UpdateCamera(&state.camera, .THIRD_PERSON)
 
-	// MARK: Draw
+	// MARK: Draw 
+
 	rl.BeginDrawing()
 
-	rl.ClearBackground(rl.RAYWHITE)
+	rl.ClearBackground(rl.BLACK)
 	rl.DrawFPS(10, 10)
 	rl.DrawText("r - reset", 10, rl.GetScreenHeight() - 20, 10, rl.RAYWHITE)
-
 	rl.BeginMode3D(state.camera)
-	// rl.DrawSphere(0, 20, {230, 41, 55, 128})
 
-	rl.DrawCubeWiresV(0, GAME_VOLUME_A - GAME_VOLUME_B, rl.GRAY)
+	rl.DrawCubeWiresV(0, VOLUME_SIZE * 2, rl.GRAY)
 	// rl.DrawGrid(20, 10)
 
 	matrices := make([dynamic]rl.Matrix, len(state.boids))
@@ -294,46 +256,16 @@ game_loop :: proc() -> bool {
 			rl.MatrixScale(SCALE, SCALE, SCALE)
 
 		matrices[i] = m
-		// append(&matrices, m)
-		// rl.DrawMesh(state.boid_model.meshes[0], state.boid_model.materials[1], m)
-		// draw_model_mesh(state.boid_model, 0, m)
-		// rl.DrawMesh(state.cube, state.cube_mat, m)
 	}
 
-	// rl.DrawMeshInstanced(
-	// 	state.boid_model.meshes[0],
-	// 	state.boid_model.materials[1],
-	// 	raw_data(matrices),
-	// 	cast(i32)len(matrices),
-	// )
-
-	// for m in state.boid_transforms {
-	// 	// rl.DrawMesh(state.cube, state.cube_mat_def, m)
-	// 	rl.DrawMesh(state.boid_model.meshes[0], state.boid_model.materials[1], m)
-	// }
-
-
-	// rl.DrawMesh(
-	// 	state.cube,
-	// 	state.cube_mat_def,
-	// 	rl.MatrixTranslate(-10, 0, 0) * rl.MatrixScale(20, 20, 20),
-	// )
-
 	rl.DrawMeshInstanced(
-		state.cube,
-		state.cube_mat,
+		state.boid_model.meshes[0],
+		state.boid_model.materials[1],
 		raw_data(matrices),
 		i32(len(state.boids)),
 	)
 
-	// rl.DrawMesh(
-	// 	state.cube,
-	// 	state.cube_mat_def,
-	// 	rl.MatrixTranslate(10, 0, 0) * rl.MatrixScale(20, 20, 20),
-	// )
-
 	rl.EndMode3D()
-
 	rl.EndDrawing()
 
 	delete(matrices)

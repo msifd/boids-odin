@@ -1,6 +1,12 @@
 {
-    // "files.autoSave": "off",
-    "triggerTaskOnSave.tasks": {
-        // "build_hot": ["source/*.odin"],
+  // "files.autoSave": "off",
+  "triggerTaskOnSave.tasks": {
+    // "build_hot": ["source/*.odin"],
+  },
+  "VsCodeTaskButtons.tasks": [
+    {
+      "label": "build_hot",
+      "task": "build_hot"
     }
+  ]
 }
