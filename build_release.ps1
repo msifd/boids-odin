@@ -1,5 +1,8 @@
-$ProjectName = "arcadia"
+$ProjectName = "boids"
 $BuildDir = "build"
+
+# Create build dir
+New-Item -ItemType Directory -Force -Path $BuildDir > $null
 
 $ExeOutPath = Join-Path -Path $BuildDir -ChildPath "$($ProjectName).exe"
 

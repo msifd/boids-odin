@@ -1,4 +1,4 @@
-package arcadia
+package boids
 
 import "core:log"
 import "core:mem"

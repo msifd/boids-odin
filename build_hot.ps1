@@ -1,4 +1,4 @@
-$ProjectName = "arcadia"
+$ProjectName = "boids"
 $BuildDir = "build"
 
 echo "Building hot runner"

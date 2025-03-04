@@ -10,7 +10,7 @@
       "request": "launch",
       "preLaunchTask": "build_hot",
       "postDebugTask": "cleanup_hot",
-      "program": "${workspaceFolder}\\build\\arcadia_hot.exe",
+      "program": "${workspaceFolder}\\build\\boids_hot.exe",
       "args": ["${workspaceFolder}\\build\\game.dll"],
       "cwd": "${workspaceFolder}",
       "environment": [],
