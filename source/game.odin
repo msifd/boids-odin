@@ -1,7 +1,7 @@
 package arcadia
 
-import "core:c/libc"
 import "core:log"
+import "core:mem"
 import rl "vendor:raylib"
 
 RES_BOID :: #load("../assets/boid.glb")
@@ -52,8 +52,8 @@ load_raylib_file: rl.LoadFileDataCallback : proc "c" (filename: cstring, data_le
 	}
 
 	len := len(orig_data)
-	data_copy := libc.malloc(uint(len))
-	libc.memcpy(data_copy, raw_data(orig_data), uint(len))
+	data_copy := rl.MemAlloc(u32(len))
+	mem.copy(data_copy, raw_data(orig_data), len)
 	data_len^ = i32(len)
 	ptr := cast([^]u8)data_copy
 	return ptr
